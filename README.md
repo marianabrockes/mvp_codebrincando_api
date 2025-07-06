@@ -27,7 +27,7 @@ Navegue até a pasta do projeto e crie um ambiente virtual. Isso isola as depend
 
 ```bash
 # Navegue para a pasta da API
-cd backend-api
+cd mvp_codebrincando_api
 
 # Crie o ambiente virtual
 python3 -m venv .venv

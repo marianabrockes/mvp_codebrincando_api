@@ -1,0 +1,17 @@
+# Ambiente Virtual
+.venv
+venv/
+__pycache__/
+
+# Arquivos de sistema (gerado pelo macOS)
+.DS_Store
+
+# Banco de dados
+*.db
+*.sqlite3
+
+# Arquivos de configuração de editores de código (opcional, mas bom ter)
+.vscode/
+.idea/
+cd
+

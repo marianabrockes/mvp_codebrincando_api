@@ -363,7 +363,7 @@ def get_explicacoes():
     return jsonify([dict(row) for row in explicacoes])
 
 
-# --- ROTA DO ROBOBRINCA (GROQ) ---
+# --- ROTA DO ROBOTECA (GROQ) ---
 @app.route("/ajuda-bot", methods=["POST"])
 def ajuda_bot():
     dados = request.get_json()
@@ -430,9 +430,14 @@ def ajuda_bot():
             "erro": "Não foi possível falar com o robô agora, tente novamente mais tarde."
         }), 500
 
+@app.route("/", methods=["GET"])
+def home():
+    return jsonify({
+        "mensagem": "API do CodeBrincando está no ar!",
+        "status": "ok"
+    })
 
 
-if __name__ == '__main__':
-    init_db()
-    app.run(debug=True, port=5001)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5001)
 

@@ -12,7 +12,6 @@ app = Flask(__name__)
 CORS(app)
 swagger = Swagger(app)
 
-
 # --- FUNÇÕES DE BANCO DE DADOS ---
 def get_db_conn():
     conn = sqlite3.connect('database.db')

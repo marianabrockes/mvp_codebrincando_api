@@ -1,16 +1,17 @@
+from flask import Flask, request, jsonify
+from flasgger import Swagger
+from flask_cors import CORS
 import sqlite3
 import os
 import requests
 from datetime import datetime
 
-from flask import Flask, request, jsonify
-from flasgger import Swagger
-from flask_cors import CORS
-
-
 app = Flask(__name__)
 CORS(app)
-swagger = Swagger(app)
+
+# Usa arquivo swagger.yaml como template principal da documentação
+swagger = Swagger(app, template_file="swagger.yaml")
+
 
 # --- FUNÇÕES DE BANCO DE DADOS ---
 def get_db_conn():
@@ -159,6 +160,45 @@ def init_db():
 # --- ROTA PARA CADASTRAR UM NOVO USUÁRIO ---
 @app.route('/cadastrar_usuario', methods=['POST'])
 def cadastrar_usuario():
+    """
+    Cadastrar novo usuário
+    ---
+    tags:
+      - Usuários
+    consumes:
+      - application/json
+    parameters:
+      - in: body
+        name: body
+        required: true
+        description: Dados do novo usuário
+        schema:
+          type: object
+          required:
+            - nome
+            - idade
+          properties:
+            nome:
+              type: string
+              example: Maria
+            idade:
+              type: integer
+              example: 10
+    responses:
+      201:
+        description: Usuário cadastrado com sucesso
+        schema:
+          type: object
+          properties:
+            mensagem:
+              type: string
+              example: "Usuário 'Maria' cadastrado com sucesso!"
+            usuario_id:
+              type: integer
+              example: 1
+      400:
+        description: Erro de validação ou payload inválido
+    """
     dados = request.get_json()
     nome = dados['nome']
     idade = dados['idade']
@@ -175,16 +215,54 @@ def cadastrar_usuario():
         "usuario_id": novo_usuario_id
     }), 201
 
+
 # --- ROTA PARA ATUALIZAR DADOS DE UM USUÁRIO (PUT) ---
 @app.route('/usuarios/<int:usuario_id>', methods=['PUT'])
 def atualizar_usuario(usuario_id):
     """
-    Atualiza o nome e/ou a idade de um usuário existente.
-    Exemplo de corpo da requisição (JSON):
-    {
-        "nome": "Novo Nome",
-        "idade": 10
-    }
+    Atualizar usuário
+    ---
+    tags:
+      - Usuários
+    consumes:
+      - application/json
+    parameters:
+      - in: path
+        name: usuario_id
+        type: integer
+        required: true
+        description: ID do usuário a ser atualizado
+      - in: body
+        name: body
+        required: true
+        description: Novos dados do usuário (nome e/ou idade)
+        schema:
+          type: object
+          properties:
+            nome:
+              type: string
+              example: Novo Nome
+            idade:
+              type: integer
+              example: 11
+    responses:
+      200:
+        description: Usuário atualizado com sucesso
+        schema:
+          type: object
+          properties:
+            mensagem:
+              type: string
+            usuario_id:
+              type: integer
+            nome:
+              type: string
+            idade:
+              type: integer
+      400:
+        description: Nenhum dado enviado para atualização
+      404:
+        description: Usuário não encontrado
     """
     dados = request.get_json() or {}
 
@@ -206,7 +284,6 @@ def atualizar_usuario(usuario_id):
         conn.close()
         return jsonify({"erro": "Usuário não encontrado."}), 404
 
-    # Se não enviar algum campo, mantemos o valor anterior
     nome_final = novo_nome if novo_nome is not None else usuario["nome"]
     idade_final = nova_idade if nova_idade is not None else usuario["idade"]
 
@@ -230,7 +307,27 @@ def atualizar_usuario(usuario_id):
 @app.route('/usuarios/<int:usuario_id>', methods=['DELETE'])
 def deletar_usuario(usuario_id):
     """
-    Remove um usuário e o progresso associado.
+    Deletar usuário
+    ---
+    tags:
+      - Usuários
+    parameters:
+      - in: path
+        name: usuario_id
+        type: integer
+        required: true
+        description: ID do usuário a ser removido
+    responses:
+      200:
+        description: Usuário removido com sucesso
+        schema:
+          type: object
+          properties:
+            mensagem:
+              type: string
+              example: "Usuário 1 removido com sucesso."
+      404:
+        description: Usuário não encontrado
     """
     conn = get_db_conn()
     cursor = conn.cursor()
@@ -244,13 +341,11 @@ def deletar_usuario(usuario_id):
         conn.close()
         return jsonify({"erro": "Usuário não encontrado."}), 404
 
-    # Apaga primeiro o progresso associado ao usuário
     cursor.execute(
         "DELETE FROM progresso_usuarios WHERE usuario_id = ?",
         (usuario_id,)
     )
 
-    # Depois apaga o usuário
     cursor.execute(
         "DELETE FROM usuarios WHERE id = ?",
         (usuario_id,)
@@ -263,9 +358,45 @@ def deletar_usuario(usuario_id):
         "mensagem": f"Usuário {usuario_id} removido com sucesso."
     }), 200
 
+
 # --- ROTAS DE PROGRESSO/DESAFIOS ---
 @app.route('/progresso/<int:usuario_id>', methods=['GET'])
 def buscar_progresso(usuario_id):
+    """
+    Listar desafios e status de um usuário
+    ---
+    tags:
+      - Progresso
+    parameters:
+      - in: path
+        name: usuario_id
+        type: integer
+        required: true
+        description: ID do usuário
+    responses:
+      200:
+        description: Lista de desafios com status para o usuário
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              nome:
+                type: string
+              linguagem:
+                type: string
+              instrucao:
+                type: string
+              status:
+                type: string
+                example: pendente
+              codigo_bugado:
+                type: string
+              codigo_esperado:
+                type: string
+    """
     conn = get_db_conn()
     query = """
         SELECT
@@ -287,6 +418,55 @@ def buscar_progresso(usuario_id):
 
 @app.route('/progresso', methods=['POST'])
 def submeter_progresso():
+    """
+    Submeter código de um desafio
+    ---
+    tags:
+      - Progresso
+    consumes:
+      - application/json
+    parameters:
+      - in: body
+        name: body
+        required: true
+        description: Dados da submissão de desafio
+        schema:
+          type: object
+          required:
+            - usuario_id
+            - desafio_id
+            - codigo_submetido
+          properties:
+            usuario_id:
+              type: integer
+              example: 1
+            desafio_id:
+              type: integer
+              example: 2
+            codigo_submetido:
+              type: string
+              example: "<h1>Olá, Mundo!</h1>"
+    responses:
+      200:
+        description: Resultado da verificação do código
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: concluido
+            mensagem:
+              type: string
+              example: Parabéns! Resposta correta!
+            correto:
+              type: boolean
+      400:
+        description: Dados incompletos ou inválidos
+      404:
+        description: Usuário ou desafio não encontrado
+      500:
+        description: Erro interno ao processar a submissão
+    """
     try:
         dados = request.get_json()
         usuario_id = dados.get('usuario_id')
@@ -347,13 +527,39 @@ def submeter_progresso():
         })
 
     except Exception as e:
-        print(f"Ocorreu um erro na rota /progresso: {e}")
+        print(f"Ocorreu un erro na rota /progresso: {e}")
         return jsonify({"erro": str(e)}), 500
 
 
 # --- ROTA PARA BUSCAR EXPLICAÇÕES ---
 @app.route('/explicacoes', methods=['GET'])
 def get_explicacoes():
+    """
+    Listar explicações iniciais
+    ---
+    tags:
+      - Conteúdo
+    responses:
+      200:
+        description: Lista de explicações exibidas na tela de introdução
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              tipo:
+                type: string
+                example: conceito
+              titulo:
+                type: string
+              texto:
+                type: string
+              codigo:
+                type: string
+                nullable: true
+    """
     conn = get_db_conn()
     explicacoes = conn.execute(
         'SELECT id, tipo, titulo, texto, codigo FROM explicacoes ORDER BY id'
@@ -365,6 +571,45 @@ def get_explicacoes():
 # --- ROTA DO ROBOTECA (GROQ) ---
 @app.route("/ajuda-bot", methods=["POST"])
 def ajuda_bot():
+    """
+    Enviar dúvida para a RoboTeca (Groq API)
+    ---
+    tags:
+      - RoboTeca
+    consumes:
+      - application/json
+    parameters:
+      - in: body
+        name: body
+        required: true
+        description: Dúvida da criança e contexto do desafio/explicação
+        schema:
+          type: object
+          required:
+            - duvida
+          properties:
+            usuario_id:
+              type: integer
+              example: 1
+            contexto:
+              type: string
+              example: "Explicação sobre HTML e tags de título."
+            duvida:
+              type: string
+              example: "Não entendi por que h1 é diferente de p."
+    responses:
+      200:
+        description: Resposta simplificada gerada pela RoboTeca
+        schema:
+          type: object
+          properties:
+            resposta_simplificada:
+              type: string
+      400:
+        description: Nenhuma dúvida enviada no corpo da requisição
+      500:
+        description: Erro ao falar com a Groq API ou chave não configurada
+    """
     dados = request.get_json()
 
     usuario_id = dados.get("usuario_id")
@@ -374,7 +619,6 @@ def ajuda_bot():
     if not duvida:
         return jsonify({"erro": "Nenhuma dúvida enviada"}), 400
 
-    # Instrução pedagógica (prompt)
     mensagem = (
         "Você é um robô tutor que ensina programação para crianças de 9 a 12 anos. "
         "Use uma linguagem neutra quanto ao gênero, chame-os de crianças ou estudantes. "
@@ -386,7 +630,6 @@ def ajuda_bot():
         "Resposta:"
     )
 
-    # Chave da API (usar variável de ambiente)
     GROQ_API_KEY = os.getenv("GROQ_API_KEY")
     if not GROQ_API_KEY:
         return jsonify({"erro": "API Key da Groq não configurada."}), 500
@@ -409,7 +652,6 @@ def ajuda_bot():
     try:
         resposta = requests.post(url, json=payload, headers=headers, timeout=20)
 
-        # Log básico para depuração, se der erro
         if resposta.status_code != 200:
             print("Groq status code:", resposta.status_code)
             print("Groq response body:", resposta.text)
@@ -429,14 +671,34 @@ def ajuda_bot():
             "erro": "Não foi possível falar com o robô agora, tente novamente mais tarde."
         }), 500
 
-@app.route("/", methods=["GET"])
-def home():
-    return jsonify({
-        "mensagem": "API do CodeBrincando está no ar!",
-        "status": "ok"
-    })
 
+# --- ROTA DE STATUS BÁSICA ---
+@app.route("/", methods=["GET"])
+def status_api():
+    """
+    Status da API
+    ---
+    tags:
+      - Status
+    responses:
+      200:
+        description: API do CodeBrincando está no ar
+        schema:
+          type: object
+          properties:
+            mensagem:
+              type: string
+              example: API do CodeBrincando está no ar 🚀
+            status:
+              type: string
+              example: ok
+    """
+    return jsonify({
+        "mensagem": "API do CodeBrincando está no ar 🚀",
+        "status": "ok"
+    }), 200
 
 if __name__ == "__main__":
+    init_db() 
     app.run(host="0.0.0.0", port=5001)
 

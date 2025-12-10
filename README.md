@@ -76,8 +76,8 @@ source venv/bin/activate
 Windows:
 
 ```bash
-python -m venv venv
-venv\Scripts\activate
+python3 -m venv venv
+source venv/bin/activate
 ```
 
 ### 3. Instalar dependências
@@ -206,6 +206,14 @@ docker stop mvp_codebrincando_api
 ```bash
 docker rm mvp_codebrincando_api
 ```
+
+---
+
+### Documentação Swagger
+
+A API possui documentação automática gerada pelo Swagger (Flasgger):
+
+👉 http://127.0.0.1:5001/apidocs/
 
 ---
 
